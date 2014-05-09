@@ -57,6 +57,7 @@ addFirst(
 	int val) 	/* value to add */
 {
 	Node *newNode = malloc(sizeof(Node));
+	if (!newNode) {fprintf(stderr,"Failed to allocate ram"); exit(1);};
 	newNode->val = val;
 	newNode->next = root;
 	return newNode;
@@ -117,8 +118,9 @@ executeProgram(
 	/* we need to measure the execution time of the process if we run it in the foreground */
 	struct timeval startTime;
 	struct timeval endTime;
-
-	gettimeofday(&startTime, NULL);
+	int timeError=0;
+	
+	if (gettimeofday(&startTime, NULL)==-1) timeError=1;
 	int childPid=fork();
 	if (childPid==-1){ fprintf(stderr, "Could not fork\n"); return 1;}
 	if (!childPid) {
@@ -132,9 +134,15 @@ executeProgram(
 			int ret, childExitStatus;
 			ret = wait(&childExitStatus); 	/* wait for child to exit */
 			if (ret==-1) { fprintf(stderr, "Failed to get return value from child"); }
-			if (childExitStatus!=0) { fprintf(stderr, "Error with code %d from %s\n",childExitStatus,program); }
-			gettimeofday(&endTime, NULL);
-			printf("Foregr elapsed: %ld ms\n", (endTime.tv_sec - startTime.tv_sec)*1000 + (endTime.tv_usec - startTime.tv_usec)/1000);
+			
+
+			if (gettimeofday(&endTime, NULL)==-1) timeError=1;
+			if (timeError){
+				printf("Foreground process %d executed in (error getting time) ms with return value %d\n",childPid, childExitStatus);			
+			}else{
+				long ms=(endTime.tv_sec - startTime.tv_sec)*1000 + (endTime.tv_usec - startTime.tv_usec)/1000;
+				printf("Foreground process %d executed in  %ld ms with return value %d\n",childPid, ms, childExitStatus);			
+			}
 		}
 	}
 	return 0;
@@ -154,7 +162,7 @@ processHasTerminated(
 	int ret;
     ret = waitpid(pid, &statval, WNOHANG);
 	int hasExited = ret == 0 ? 1 : 0;
-	if (!hasExited) printf("Process %d exited with status %d\n", pid, statval);
+	if (!hasExited) printf("Background process %d exited with status %d\n", pid, statval);
 	return hasExited;
 }
 
